@@ -1,0 +1,857 @@
+// App.jsx - React Frontend
+// Place this in your React Replit project (e.g., src/App.jsx)
+
+import React, { useState, useEffect, useRef } from 'react';
+
+// Main App component for CognitiveGPT
+function App() {
+    // State to store chat messages (user and bot)
+    const [messages, setMessages] = useState([]);
+    // State for the current input message from the user
+    const [inputMessage, setInputMessage] = useState('');
+    // State to indicate if the bot is currently processing a response
+    const [isThinking, setIsThinking] = useState(false);
+    // State to store the unique session ID for the user
+    const [sessionId, setSessionId] = useState(null);
+    // Ref for scrolling to the latest message
+    const messagesEndRef = useRef(null);
+
+    // Effect to generate a session ID when the component mounts
+    useEffect(() => {
+        // Generate a simple unique ID for the session.
+        // In a real app, this might come from a login or be more robust.
+        if (!sessionId) {
+            setSessionId(localStorage.getItem('cognitiveGptSessionId') || `user-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`);
+        }
+    }, [sessionId]);
+
+    // Effect to persist the session ID to local storage
+    useEffect(() => {
+        if (sessionId) {
+            localStorage.setItem('cognitiveGptSessionId', sessionId);
+        }
+    }, [sessionId]);
+
+    // Effect to scroll to the bottom of the chat when new messages arrive
+    useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, [messages]);
+
+    // Function to handle sending a message
+    const handleSendMessage = async () => {
+        if (inputMessage.trim() === '') return;
+
+        const userMessage = { sender: 'user', text: inputMessage };
+        setMessages((prevMessages) => [...prevMessages, userMessage]);
+        setInputMessage('');
+        setIsThinking(true); // Set thinking state
+
+        try {
+            // IMPORTANT: Replace 'YOUR_BACKEND_REPL_URL' with the actual URL of your FastAPI backend
+            // For example: 'https://your-backend-repl-name.replit.dev'
+            const backendBaseUrl = 'YOUR_BACKEND_REPL_URL'; // <-- User needs to update this!
+            const chatEndpoint = `${backendBaseUrl}/chat`;
+
+            if (backendBaseUrl.includes('YOUR_BACKEND_REPL_URL')) {
+                throw new Error("Please update 'YOUR_BACKEND_REPL_URL' in App.jsx with your actual Replit backend URL (e.g., https://your-backend-repl-name.replit.dev).");
+            }
+
+            // Make a POST request to the FastAPI backend
+            const response = await fetch(chatEndpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                // Include the sessionId in the request body
+                body: JSON.stringify({ session_id: sessionId, message: inputMessage }),
+            });
+
+            if (!response.ok) {
+                // Attempt to read error message from response body
+                const errorData = await response.json().catch(() => ({ detail: 'No detailed error message from server.' }));
+                throw new Error(`HTTP error! status: ${response.status} - ${errorData.detail || response.statusText}`);
+            }
+
+            const data = await response.json();
+            // Add the bot's response to the messages
+            setMessages((prevMessages) => [...prevMessages, { sender: 'bot', text: data.response }]);
+
+        } catch (error) {
+            console.error('Error sending message:', error);
+            setMessages((prevMessages) => [...prevMessages, { sender: 'bot', text: `Oops! Something went wrong: ${error.message}. Please check console for details.` }]);
+        } finally {
+            setIsThinking(false); // Reset thinking state
+        }
+    };
+
+    // Function to handle Enter key press in the input field
+    const handleKeyPress = (e) => {
+        if (e.key === 'Enter' && !isThinking) {
+            handleSendMessage();
+        }
+    };
+
+    return (
+        // Main container with dark background and Inter font
+        <div className="min-h-screen bg-gray-950 text-gray-100 font-inter flex flex-col items-center justify-center p-4">
+            {/* Tailwind CSS configuration for neon glow */}
+            <style>
+                {`
+                .text-neon-blue {
+                    color: #00FFFF; /* Cyan */
+                    text-shadow: 0 0 5px #00FFFF, 0 0 10px #00FFFF, 0 0 20px #00FFFF, 0 0 40px #00FFFF;
+                }
+                .border-neon-blue {
+                    border-color: #00FFFF;
+                    box-shadow: 0 0 5px #00FFFF, 0 0 10px #00FFFF, 0 0 20px #00FFFF;
+                }
+                .bg-neon-blue-glow {
+                    background-color: #00FFFF;
+                    box-shadow: 0 0 8px #00FFFF, 0 0 16px #00FFFF, 0 0 24px #00FFFF;
+                }
+                .btn-neon-blue:hover {
+                    background-color: #00FFFF;
+                    box-shadow: 0 0 8px #00FFFF, 0 0 16px #00FFFF, 0 0 24px #00FFFF;
+                    color: #1a202c; /* Dark text on hover */
+                }
+                .input-neon-blue:focus {
+                    border-color: #00FFFF;
+                    box-shadow: 0 0 5px #00FFFF, 0 0 10px #00FFFF, 0 0 20px #00FFFF;
+                    outline: none;
+                }
+                `}
+            </style>
+
+            {/* Application Title */}
+            <h1 className="text-5xl font-extrabold mb-8 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500 animate-pulse">
+                CognitiveGPT
+            </h1>
+
+            {/* Chat Container */}
+            <div className="w-full max-w-2xl bg-gray-900 rounded-xl shadow-2xl flex flex-col h-[70vh] border border-gray-700 border-neon-blue">
+                {/* Chat Messages Display Area */}
+                <div className="flex-1 p-6 overflow-y-auto custom-scrollbar">
+                    {messages.length === 0 && (
+                        <div className="text-center text-gray-400 mt-10">
+                            Start a conversation with your Socratic AI tutor!
+                        </div>
+                    )}
+                    {messages.map((msg, index) => (
+                        <div
+                            key={index}
+                            className={`mb-4 p-3 rounded-lg max-w-[80%] ${
+                                msg.sender === 'user'
+                                    ? 'bg-blue-700 ml-auto rounded-br-none text-right'
+                                    : 'bg-gray-700 mr-auto rounded-bl-none'
+                            }`}
+                        >
+                            <p className="text-sm font-medium">
+                                {msg.sender === 'user' ? 'You' : 'CognitiveGPT'}
+                            </p>
+                            <p className="text-lg">{msg.text}</p>
+                        </div>
+                    ))}
+                    {isThinking && (
+                        <div className="mb-4 p-3 rounded-lg bg-gray-700 mr-auto rounded-bl-none animate-pulse">
+                            <p className="text-sm font-medium">CognitiveGPT</p>
+                            <p className="text-lg">Thinking...</p>
+                        </div>
+                    )}
+                    <div ref={messagesEndRef} /> {/* Scroll target */}
+                </div>
+
+                {/* Input Area */}
+                <div className="p-4 border-t border-gray-700 flex items-center">
+                    <input
+                        type="text"
+                        className="flex-1 p-3 rounded-lg bg-gray-800 text-gray-100 placeholder-gray-500 border border-gray-600 input-neon-blue focus:ring-2 focus:ring-blue-500 transition-all duration-300"
+                        placeholder="Ask your question..."
+                        value={inputMessage}
+                        onChange={(e) => setInputMessage(e.target.value)}
+                        onKeyPress={handleKeyPress}
+                        disabled={isThinking}
+                    />
+                    <button
+                        onClick={handleSendMessage}
+                        className="ml-4 px-6 py-3 rounded-lg bg-blue-600 text-white font-semibold shadow-lg transition-all duration-300 btn-neon-blue disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled={isThinking || inputMessage.trim() === ''}
+                    >
+                        {isThinking ? 'Sending...' : 'Send'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+export default App;
+```python
+# requirements.txt - Python Backend Dependencies
+# Place this in the root of your Python Replit project
+
+fastapi==0.111.0
+uvicorn==0.30.1
+langchain==0.2.5
+langgraph==0.0.60
+pydantic==2.7.4
+python-dotenv==1.0.1
+google-generativeai==0.7.1
+anthropic==0.28.1
+firebase-admin==6.4.0
+```python
+# .env - Python Backend Environment Variables
+# Create a file named .env in the root of your Python Replit project
+# Replace with your actual API keys
+GEMINI_API_KEY="YOUR_GEMINI_API_KEY"
+ANTHROPIC_API_KEY="YOUR_ANTHROPIC_API_KEY"
+```python
+# firebase_config.py - Python Backend Firebase Configuration
+# Place this in the root of your Python Replit project
+
+import os
+import json
+
+# These global variables are provided by the Canvas environment.
+# DO NOT modify these variable names.
+# They are used to configure Firebase and authenticate the user.
+
+# __app_id: The current app ID provided in the canvas environment as a string.
+# Use 'default-app-id' for local development if __app_id is not defined.
+app_id = os.environ.get('__app_id', 'default-cognitive-gpt-app')
+
+# __firebase_config: Firebase configuration provided in the canvas environment as a JSON string.
+# Parse it into a Python dictionary.
+firebase_config = json.loads(os.environ.get('__firebase_config', '{}'))
+
+# __initial_auth_token: Firebase custom auth token string automatically provided.
+# Use this for signInWithCustomToken.
+initial_auth_token = os.environ.get('__initial_auth_token', None)
+```python
+# llm_utils.py - Python Backend LLM Utilities
+# Place this file in your Python Replit project directory (e.g., in a 'src' folder or directly in root)
+
+import os
+from dotenv import load_dotenv
+import google.generativeai as genai
+from anthropic import Anthropic
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Configure Gemini API
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+# Initialize Anthropic client
+anthropic_client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+
+def call_gemini(prompt: str) -> str:
+    """
+    Calls the Gemini LLM with the given prompt.
+    """
+    try:
+        model = genai.GenerativeModel('gemini-2.0-flash') # Using gemini-2.0-flash as per instructions
+        response = model.generate_content(prompt)
+        return response.text
+    except Exception as e:
+        print(f"Error calling Gemini: {e}")
+        return "I'm having trouble connecting to Gemini right now."
+
+def call_claude(prompt: str) -> str:
+    """
+    Calls the Anthropic Claude LLM with the given prompt.
+    """
+    try:
+        # Using Claude 3.5 Sonnet as a capable model
+        response = anthropic_client.messages.create(
+            model="claude-3-5-sonnet-20240620",
+            max_tokens=500,
+            messages=[
+                {"role": "user", "content": prompt}
+            ]
+        )
+        return response.content[0].text
+    except Exception as e:
+        print(f"Error calling Claude: {e}")
+        return "I'm having trouble connecting to Claude right now."
+```python
+# student_model.py - Python Backend Student Model (Firestore Integrated)
+# Place this file in your Python Replit project directory
+
+from pydantic import BaseModel
+from typing import Dict, Any, Optional
+import json
+import firebase_admin
+from firebase_admin import credentials, firestore, auth # auth is imported but not directly used here
+
+# Firestore database instance (initialized in main.py)
+db = None
+app_id = None # Will be set from firebase_config.py
+
+class StudentProfile(BaseModel):
+    """
+    Represents a student's learning profile.
+    This is a simplified JSON-based model.
+    """
+    user_id: str
+    knowledge_areas: Dict[str, float] = {}  # e.g., {"Algebra": 0.7, "Geometry": 0.5}
+    misconceptions: Dict[str, int] = {}    # e.g., {"Pythagorean Theorem": 2} (count of times misconception observed)
+    progress_log: list[str] = []           # Log of topics covered or milestones
+    learning_style: Optional[str] = None   # e.g., "visual", "auditory", "kinesthetic"
+    last_interaction_summary: Optional[str] = None # Summary of last chat turn
+    # Add more fields as needed for richer profiling
+
+    def to_firestore_dict(self):
+        """Converts the Pydantic model to a dictionary suitable for Firestore."""
+        data = self.dict()
+        # Firestore handles basic types, dicts, and lists directly.
+        # If you had nested lists or very complex objects, you might need to JSON.stringify them here.
+        return data
+
+    @classmethod
+    def from_firestore_dict(cls, data: Dict[str, Any]):
+        """Creates a StudentProfile instance from a Firestore dictionary."""
+        return cls(**data)
+
+def initialize_firestore(firebase_app, current_app_id):
+    """Initializes the Firestore DB instance and sets the app_id."""
+    global db, app_id
+    db = firestore.client(firebase_app)
+    app_id = current_app_id
+    print("Firestore initialized in student_model.py")
+
+async def get_student_profile(user_id: str) -> StudentProfile:
+    """
+    Retrieves a student's profile from Firestore. Creates a new one if it doesn't exist.
+    """
+    if not db:
+        print("Firestore not initialized in student_model.py. Cannot fetch profile.")
+        return StudentProfile(user_id=user_id) # Return a default in-memory profile
+
+    # Define the Firestore document path for private user data
+    doc_ref = db.collection(f"artifacts/{app_id}/users/{user_id}/student_profiles").document(user_id)
+    
+    try:
+        doc = await doc_ref.get()
+        if doc.exists:
+            profile_data = doc.to_dict()
+            print(f"Retrieved profile for user {user_id} from Firestore.")
+            return StudentProfile.from_firestore_dict(profile_data)
+        else:
+            # Create a new profile if it doesn't exist
+            new_profile = StudentProfile(user_id=user_id)
+            await doc_ref.set(new_profile.to_firestore_dict())
+            print(f"Created new profile for user {user_id} in Firestore.")
+            return new_profile
+    except Exception as e:
+        print(f"Error getting student profile from Firestore for {user_id}: {e}")
+        # Fallback to a default in-memory profile in case of Firestore error
+        return StudentProfile(user_id=user_id)
+
+async def update_student_profile(user_id: str, updates: Dict[str, Any]):
+    """
+    Updates an existing student's profile in Firestore with new information.
+    """
+    if not db:
+        print("Firestore not initialized in student_model.py. Cannot update profile.")
+        return
+
+    doc_ref = db.collection(f"artifacts/{app_id}/users/{user_id}/student_profiles").document(user_id)
+    
+    try:
+        # Fetch current profile to merge updates, or create if not exists
+        current_profile_doc = await doc_ref.get()
+        if current_profile_doc.exists:
+            current_data = current_profile_doc.to_dict()
+            # Merge updates: simple overwrite for top-level keys
+            # For nested dicts/lists, you might need more sophisticated merge logic
+            merged_data = {**current_data, **updates}
+            await doc_ref.update(merged_data)
+            print(f"Updated profile for user {user_id} in Firestore.")
+        else:
+            # If profile doesn't exist, create it with the updates
+            new_profile = StudentProfile(user_id=user_id, **updates)
+            await doc_ref.set(new_profile.to_firestore_dict())
+            print(f"Created new profile with updates for user {user_id} in Firestore (was missing).")
+    except Exception as e:
+        print(f"Error updating student profile in Firestore for {user_id}: {e}")
+```python
+# agents.py - Python Backend LangGraph Agents
+# Place this file in your Python Replit project directory
+
+from typing import TypedDict, Annotated, List, Dict, Any
+from langgraph.graph import StateGraph, END
+from langchain_core.messages import BaseMessage
+from llm_utils import call_gemini, call_claude
+from student_model import StudentProfile, get_student_profile, update_student_profile
+import json # Import json for parsing LLM output
+
+# Define the state for LangGraph
+class AgentState(TypedDict):
+    """
+    Represents the state of our multi-agent system.
+    """
+    chat_history: Annotated[List[BaseMessage], lambda x, y: x + y] # Accumulate chat messages
+    user_id: str # Identifier for the student
+    student_profile: StudentProfile # The current student's learning profile
+    current_question: str # The Socratic question posed by the QuestioningAgent
+    student_response: str # The student's latest response
+    feedback: str # Feedback from the FeedbackAgent
+    safety_check_result: str # Result from the TrustworthinessSafetyAgent
+    next_action: str # What the graph should do next
+
+class QuestioningAgent:
+    """
+    Agent responsible for crafting Socratic-style prompts.
+    """
+    async def __call__(self, state: AgentState) -> Dict[str, Any]:
+        print("--- QuestioningAgent: Crafting Socratic prompt ---")
+        student_profile = state.get("student_profile", StudentProfile(user_id=state["user_id"]))
+        chat_history = state.get("chat_history", [])
+        last_user_message = chat_history[-1].content if chat_history and chat_history[-1].type == 'human' else ""
+
+        # Construct a prompt for the LLM to generate a Socratic question
+        # This prompt is crucial and needs careful engineering for quality Socratic interaction.
+        llm_prompt = f"""
+        You are a Socratic tutor. Your goal is to guide the student to understand a concept by asking thought-provoking questions, not by giving direct answers.
+        
+        Student's current context/last response: "{last_user_message}"
+        Student's profile summary: {student_profile.dict()}
+        
+        Based on the above, ask a single, open-ended Socratic question or provide a hint that encourages deeper thinking.
+        Avoid direct answers. Focus on principles, implications, or alternative perspectives.
+        """
+        
+        # Use Gemini for questioning
+        socratic_question = call_gemini(llm_prompt)
+        print(f"Generated Question: {socratic_question}")
+        
+        return {"current_question": socratic_question, "next_action": "await_student_response"}
+
+class StudentModelAgent:
+    """
+    Agent to track the learner’s knowledge, progress, and misconceptions.
+    Updates the in-memory student profile.
+    """
+    async def __call__(self, state: AgentState) -> Dict[str, Any]:
+        print("--- StudentModelAgent: Updating student profile ---")
+        user_id = state["user_id"]
+        student_response = state.get("student_response", "")
+        current_question = state.get("current_question", "")
+        
+        # Use an LLM to analyze the student's response and suggest profile updates
+        # This is a critical area for refinement.
+        llm_analysis_prompt = f"""
+        Analyze the following student response to a Socratic question.
+        Student's last question: "{current_question}"
+        Student's response: "{student_response}"
+        
+        Based on this, suggest updates to the student's profile in a JSON format.
+        Focus on:
+        - 'knowledge_areas': How confident or knowledgeable they seem on related topics (0.0 to 1.0).
+        - 'misconceptions': Any clear misunderstandings (increment count if existing, add new if novel).
+        - 'progress_log': Brief summary of what they demonstrated understanding of.
+        - 'last_interaction_summary': A concise summary of this turn.
+        
+        Example JSON format:
+        {{
+            "knowledge_areas": {{"TopicA": 0.7, "TopicB": 0.4}},
+            "misconceptions": {{"ConceptX": 1}},
+            "progress_log": ["Demonstrated understanding of Y"],
+            "last_interaction_summary": "Discussed Z."
+        }}
+        
+        Provide only the JSON object.
+        """
+        
+        # Use Claude for analysis, as it can be good for structured output
+        profile_updates_json_str = call_claude(llm_analysis_prompt)
+        
+        try:
+            # Attempt to parse the JSON output from the LLM
+            profile_updates = json.loads(profile_updates_json_str)
+            # Ensure 'progress_log' is handled as a list
+            if 'progress_log' in profile_updates and not isinstance(profile_updates['progress_log'], list):
+                profile_updates['progress_log'] = [profile_updates['progress_log']]
+            
+            await update_student_profile(user_id, profile_updates) # Use await for async Firestore update
+            print(f"Student profile updated for {user_id} with: {profile_updates}")
+        except json.JSONDecodeError as e:
+            print(f"Failed to parse LLM response for student profile updates: {profile_updates_json_str}. Error: {e}")
+            # Handle error: maybe log it, or try a simpler update
+            await update_student_profile(user_id, {"last_interaction_summary": "Could not parse detailed analysis."})
+        
+        # Re-fetch the updated profile to ensure the state has the latest version from Firestore
+        updated_profile = await get_student_profile(user_id)
+        return {"student_profile": updated_profile, "next_action": "evaluate_feedback"}
+
+class FeedbackAgent:
+    """
+    Agent to evaluate and adapt guidance based on student response and profile.
+    """
+    async def __call__(self, state: AgentState) -> Dict[str, Any]:
+        print("--- FeedbackAgent: Evaluating student response ---")
+        student_response = state.get("student_response", "")
+        current_question = state.get("current_question", "")
+        student_profile = state.get("student_profile", StudentProfile(user_id=state["user_id"]))
+
+        llm_feedback_prompt = f"""
+        Evaluate the student's response to the Socratic question.
+        Question: "{current_question}"
+        Student Response: "{student_response}"
+        Student Profile: {student_profile.dict()}
+        
+        Based on this, determine if the student's response indicates:
+        1. Good progress towards understanding the concept.
+        2. Partial understanding, needing further probing.
+        3. A significant misconception or lack of understanding.
+        
+        Provide a concise internal feedback string (e.g., "Good progress", "Needs more probing", "Misconception detected").
+        This feedback will inform the next Socratic question.
+        """
+        
+        # Use Gemini for feedback evaluation
+        feedback_result = call_gemini(llm_feedback_prompt)
+        print(f"Feedback: {feedback_result}")
+        
+        return {"feedback": feedback_result, "next_action": "check_safety"}
+
+class TrustworthinessSafetyAgent:
+    """
+    Agent to ensure responses are ethical, age-appropriate, and aligned with pedagogy.
+    This is a critical placeholder for a robust safety layer.
+    """
+    async def __call__(self, state: AgentState) -> Dict[str, Any]:
+        print("--- TrustworthinessSafetyAgent: Performing safety check ---")
+        # In a real system, this would involve:
+        # - Content moderation APIs (e.g., Google's Safety Settings, OpenAI's moderation API)
+        # - Custom rules based on pedagogical guidelines
+        # - Checking for harmful, biased, or off-topic content
+        
+        # Check the question before sending
+        response_to_check = state.get("current_question", "")
+        # Also check the student's response for safety concerns
+        student_response_to_check = state.get("student_response", "")
+
+        # Simple keyword check for demonstration
+        if "direct answer" in response_to_check.lower() or "unethical" in response_to_check.lower():
+            safety_result = "FLAGGED: Potential direct answer or inappropriate content in bot's question."
+            print(safety_result)
+            return {"safety_check_result": safety_result, "next_action": "re_question"} # Reroute if flagged
+        
+        if "hate speech" in student_response_to_check.lower() or "harmful" in student_response_to_check.lower():
+            safety_result = "FLAGGED: Inappropriate content in student's response."
+            print(safety_result)
+            # You might want a different 'next_action' here, e.g., "end_session" or "warn_student"
+            return {"safety_check_result": safety_result, "next_action": "re_question"} # For now, re-question
+
+        safety_result = "CLEAN"
+        print(f"Safety check result: {safety_result}")
+        
+        return {"safety_check_result": safety_result, "next_action": "respond_to_student"}
+
+# Define the graph
+def create_socratic_graph():
+    workflow = StateGraph(AgentState)
+
+    # Add nodes for each agent
+    workflow.add_node("questioning_agent", QuestioningAgent())
+    workflow.add_node("student_model_agent", StudentModelAgent())
+    workflow.add_node("feedback_agent", FeedbackAgent())
+    workflow.add_node("trustworthiness_safety_agent", TrustworthinessSafetyAgent())
+
+    # Define the entry point
+    workflow.set_entry_point("questioning_agent")
+
+    # Define edges (transitions)
+    # After questioning, the graph implicitly waits for student response (handled by API)
+    # When student responds, the flow starts from student_model_agent
+    workflow.add_edge("student_model_agent", "feedback_agent")
+    workflow.add_edge("feedback_agent", "trustworthiness_safety_agent")
+
+    # Conditional edge from safety agent:
+    # If flagged, go back to questioning (to rephrase), otherwise end (to send response)
+    workflow.add_conditional_edges(
+        "trustworthiness_safety_agent",
+        lambda state: state["next_action"], # This uses the 'next_action' key from the agent's return
+        {
+            "re_question": "questioning_agent", # If flagged, try to re-ask
+            "respond_to_student": END # If clean, send response (handled by the API endpoint)
+        }
+    )
+
+    return workflow.compile()
+```python
+# main.py - Python Backend FastAPI Application
+# Place this in the root of your Python Replit project
+
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+import uvicorn
+import uuid
+from langchain_core.messages import HumanMessage, AIMessage
+import firebase_admin
+from firebase_admin import credentials, firestore, auth
+import asyncio # For async operations
+
+# Import Firebase configuration and app ID
+from firebase_config import app_id, firebase_config, initial_auth_token
+
+# Import agent logic and state from agents.py
+from agents import AgentState, create_socratic_graph
+
+# Import student model functions (now Firestore-enabled)
+from student_model import get_student_profile, update_student_profile, initialize_firestore, StudentProfile
+
+# Initialize FastAPI app
+app = FastAPI(
+    title="CognitiveGPT Backend",
+    description="Multi-Agentic AI for Personalized Student Learning using Socratic Method",
+    version="0.1.0"
+)
+
+# Configure CORS to allow requests from your React frontend
+# IMPORTANT: In production, replace "*" with your actual frontend URL (e.g., "[https://your-frontend-repl-name.replit.dev](https://your-frontend-repl-name.replit.dev)")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # Allows all origins, change for production
+    allow_credentials=True,
+    allow_methods=["*"], # Allows all methods (GET, POST, etc.)
+    allow_headers=["*"], # Allows all headers
+)
+
+# Global Firebase app and Firestore DB instance
+firebase_app = None
+db = None
+current_auth_user_id = None # Store the authenticated user ID
+
+# Initialize the LangGraph state machine (compiled once at startup)
+socratic_graph = create_socratic_graph()
+
+# --- Firebase Initialization and Authentication ---
+async def initialize_firebase():
+    """Initializes Firebase Admin SDK and authenticates."""
+    global firebase_app, db, current_auth_user_id
+
+    if not firebase_admin._apps: # Check if app is already initialized
+        try:
+            # Use a dummy credential if firebase_config is empty (e.g., for local testing without full setup)
+            if firebase_config:
+                cred = credentials.Certificate(firebase_config)
+                firebase_app = firebase_admin.initialize_app(cred)
+                print("Firebase Admin SDK initialized with provided config.")
+            else:
+                # Fallback for local dev if no config is available (will use default credentials if running on GCP)
+                firebase_app = firebase_admin.initialize_app()
+                print("Firebase Admin SDK initialized with default credentials (no config provided).")
+
+            db = firestore.client(firebase_app)
+            initialize_firestore(firebase_app, app_id) # Pass initialized app and app_id to student_model
+
+            # Authenticate with the initial custom token or anonymously
+            if initial_auth_token:
+                # Use auth.verify_id_token for custom tokens from a secure source
+                # For this Canvas environment, the token is provided securely.
+                user = auth.UserRecord(uid="canvas_user_id") # Dummy user record for local testing
+                try:
+                    user = await auth.verify_id_token(initial_auth_token)
+                except Exception as e:
+                    print(f"Error verifying custom token: {e}. Falling back to anonymous sign-in.")
+                    # If token verification fails, fall back to anonymous sign-in
+                    anon_user = await auth.create_user()
+                    current_auth_user_id = anon_user.uid
+                    print(f"Signed in anonymously due to token error. User ID: {current_auth_user_id}")
+                    return
+
+                current_auth_user_id = user['uid']
+                print(f"Authenticated with custom token. User ID: {current_auth_user_id}")
+            else:
+                # Sign in anonymously if no custom token is provided
+                # Note: Anonymous sign-in might require enabling it in Firebase Auth settings
+                # For a production app, you'd typically have a more robust authentication flow.
+                anon_user = await auth.create_user() # Create a new anonymous user
+                current_auth_user_id = anon_user.uid
+                print(f"Signed in anonymously. User ID: {current_auth_user_id}")
+
+        except Exception as e:
+            print(f"Error initializing Firebase or authenticating: {e}")
+            # In a real app, you might want to exit or handle this more gracefully
+            # For now, allow the app to run but with limited/no persistence.
+            db = None # Ensure db is None if initialization fails
+            current_auth_user_id = "anonymous_user_fallback" # Fallback user ID
+
+# Run Firebase initialization on startup
+@app.on_event("startup")
+async def startup_event():
+    await initialize_firebase()
+
+# Request body model for chat messages
+class ChatRequest(BaseModel):
+    session_id: str | None = None # Optional session ID for existing users
+    message: str
+
+# Response body model for chat messages
+class ChatResponse(BaseModel):
+    session_id: str
+    response: str
+    student_profile_summary: Dict[str, Any] # Changed to Dict[str, Any] for flexibility
+
+# --- API Endpoints ---
+
+@app.get("/")
+async def read_root():
+    """
+    Root endpoint for basic health check.
+    """
+    return {"message": "Welcome to CognitiveGPT Backend! API is running."}
+
+@app.post("/chat", response_model=ChatResponse)
+async def chat_with_socratic_bot(request: ChatRequest):
+    """
+    Handles chat interactions with the Socratic chatbot.
+    Manages the multi-agent LangGraph execution for each turn.
+    """
+    # Use the authenticated user ID for data storage
+    user_id = current_auth_user_id
+    if not user_id:
+        print("Warning: No authenticated user ID. Using a fallback for this session.")
+        user_id = request.session_id if request.session_id else str(uuid.uuid4()) # Fallback if auth fails
+
+    # Ensure Firestore DB is initialized before proceeding
+    if not db:
+        print("Error: Firestore DB is not initialized. Cannot proceed with chat.")
+        raise HTTPException(status_code=500, detail="Backend database not initialized.")
+
+    # Get or create the student profile from Firestore
+    student_profile = await get_student_profile(user_id)
+
+    # Firestore document reference for LangGraph session state
+    # Store session state under the authenticated user's private data
+    session_doc_ref = db.collection(f"artifacts/{app_id}/users/{user_id}/cognitive_gpt_sessions").document(request.session_id)
+
+    # Retrieve or initialize the graph state for this session from Firestore
+    current_graph_state_doc = await session_doc_ref.get()
+    if current_graph_state_doc.exists:
+        current_graph_state_data = current_graph_state_doc.to_dict()
+        # Ensure chat_history is a list of BaseMessage objects
+        initial_chat_history = []
+        for msg in current_graph_state_data.get("chat_history", []):
+            if msg.get('type') == 'human':
+                initial_chat_history.append(HumanMessage(content=msg.get('content', '')))
+            elif msg.get('type') == 'ai':
+                initial_chat_history.append(AIMessage(content=msg.get('content', '')))
+        
+        current_graph_state = {
+            **current_graph_state_data,
+            "chat_history": initial_chat_history,
+            "student_profile": student_profile # Ensure the latest profile is used
+        }
+        print(f"Retrieved session state for {request.session_id} from Firestore.")
+    else:
+        current_graph_state = {
+            "chat_history": [],
+            "user_id": user_id,
+            "student_profile": student_profile,
+            "current_question": "",
+            "student_response": "",
+            "feedback": "",
+            "safety_check_result": "",
+            "next_action": ""
+        }
+        initial_chat_history = []
+        print(f"No existing session state for {request.session_id}. Initializing new session.")
+
+    # Add the user's message to the chat history
+    initial_chat_history.append(HumanMessage(content=request.message))
+
+    # Determine the starting point for the graph based on the current state
+    # If no previous state, start with the questioning agent.
+    # Otherwise, assume the last step was awaiting student response.
+    start_node = "questioning_agent"
+    if current_graph_state.get("next_action") == "await_student_response":
+        # If the bot was waiting for a response, the next step is to process it
+        start_node = "student_model_agent"
+    elif not current_graph_state.get("current_question"):
+        # If no question has been asked yet (e.g., first message), start with questioning
+        start_node = "questioning_agent"
+    else:
+        # If it's a continuing conversation and a question was already asked,
+        # and we're not explicitly awaiting a response, it means the user
+        # is responding to the last question.
+        start_node = "student_model_agent"
+
+
+    # Prepare the input state for the graph
+    input_state = {
+        "user_id": user_id,
+        "chat_history": initial_chat_history,
+        "student_profile": student_profile,
+        "student_response": request.message, # The latest user message is the student's response
+        "current_question": current_graph_state.get("current_question", "")
+    }
+
+    try:
+        # Invoke the LangGraph with the current state and input
+        final_state = await socratic_graph.ainvoke(input_state) # Use ainvoke for async graph execution
+
+        # Update the student profile in Firestore with the latest state from the graph
+        await update_student_profile(user_id, final_state["student_profile"].dict())
+
+        bot_response = "I'm thinking... please wait for the next question." # Default if no immediate question
+        
+        # Logic to determine the bot's response to the user
+        if final_state.get("safety_check_result") == "FLAGGED":
+            bot_response = "I need to rephrase that. Let me try again."
+            # If flagged, the graph should ideally loop back to questioning_agent
+            # The next invocation will handle this.
+            # For now, just a message to the user.
+        elif final_state.get("current_question"):
+            bot_response = final_state["current_question"]
+            # Add bot's question to chat history for next turn
+            final_state["chat_history"].append(AIMessage(content=bot_response))
+            final_state["next_action"] = "await_student_response" # Set flag for next turn
+        else:
+            # Fallback if no specific question or flagged status is returned
+            bot_response = "I'm processing your request. Please continue."
+
+
+        # Prepare the state to be saved to Firestore
+        # Convert BaseMessage objects to dictionaries for Firestore compatibility
+        savable_chat_history = []
+        for msg in final_state["chat_history"]:
+            if isinstance(msg, HumanMessage):
+                savable_chat_history.append({"type": "human", "content": msg.content})
+            elif isinstance(msg, AIMessage):
+                savable_chat_history.append({"type": "ai", "content": msg.content})
+
+        # Create a dictionary to save, excluding non-serializable objects like StudentProfile
+        state_to_save = {
+            "chat_history": savable_chat_history,
+            "user_id": final_state["user_id"],
+            # student_profile is saved separately via update_student_profile
+            "current_question": final_state.get("current_question", ""),
+            "student_response": final_state.get("student_response", ""),
+            "feedback": final_state.get("feedback", ""),
+            "safety_check_result": final_state.get("safety_check_result", ""),
+            "next_action": final_state.get("next_action", "")
+        }
+        
+        # Save the updated graph state to Firestore
+        await session_doc_ref.set(state_to_save)
+        print(f"Saved session state for {request.session_id} to Firestore.")
+
+        return {
+            "session_id": request.session_id,
+            "response": bot_response,
+            "student_profile_summary": final_state["student_profile"].dict() # Send back the latest profile
+        }
+
+    except Exception as e:
+        print(f"Error during LangGraph invocation or Firestore operation: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {e}")
+
+# --- Run the FastAPI app ---
+if __name__ == "__main__":
+    # Ensure Firebase is initialized before starting the server
+    # This is handled by the @app.on_event("startup") decorator in a deployed FastAPI app
+    # For local running, you might need to manually call asyncio.run(initialize_firebase())
+    uvicorn.run(app, host="0.0.0.0", port=8000)
