@@ -3,13 +3,6 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
 const app = express();
-
-// Validate required environment variables
-if (!process.env.DATABASE_URL) {
-  console.error('DATABASE_URL is required but not found in environment variables');
-  process.exit(1);
-}
-
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 

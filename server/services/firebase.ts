@@ -10,16 +10,15 @@ class FirebaseService {
     try {
       // Check if we have Firebase Admin credentials (server-side)
       const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT;
-      const projectId = process.env.FIREBASE_PROJECT_ID;
       
-      if (serviceAccountKey && projectId) {
+      if (serviceAccountKey) {
         // Initialize Firebase Admin SDK if service account is available
         if (!admin.apps.length) {
           const serviceAccount = JSON.parse(serviceAccountKey);
           
           admin.initializeApp({
             credential: admin.credential.cert(serviceAccount),
-            projectId: projectId,
+            projectId: process.env.FIREBASE_PROJECT_ID,
           });
         }
 
