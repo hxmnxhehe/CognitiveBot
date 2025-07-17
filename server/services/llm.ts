@@ -1,17 +1,18 @@
 import { GoogleGenAI } from '@google/genai';
-import OpenRouter from 'openrouter-api';
+import OpenAI from 'openai';
 
 class LLMService {
   private gemini: GoogleGenAI;
-  private openrouter: OpenRouter;
+  private openrouter: OpenAI;
 
   constructor() {
     this.gemini = new GoogleGenAI({ 
       apiKey: process.env.GEMINI_API_KEY || '' 
     });
     
-    this.openrouter = new OpenRouter({
+    this.openrouter = new OpenAI({
       apiKey: process.env.OPENROUTER_API_KEY || '',
+      baseURL: 'https://openrouter.ai/api/v1',
     });
   }
 
