@@ -1,3 +1,4 @@
+
 # CognitiveGPT - Socratic AI Learning System
 
 ## Overview
@@ -22,7 +23,7 @@ Preferred communication style: Simple, everyday language.
 - **Runtime**: Node.js with Express.js framework
 - **Language**: TypeScript with ES modules
 - **Database**: PostgreSQL with Drizzle ORM
-- **AI Integration**: Multi-provider setup (Google Gemini, Anthropic Claude)
+- **AI Integration**: Multi-provider setup (Google Gemini, OpenRouter)
 - **Agent System**: Custom LangGraph implementation for AI workflow orchestration
 - **Session Management**: In-memory storage with planned Firebase integration
 
@@ -77,7 +78,7 @@ The core of the application is a sophisticated multi-agent system that processes
 
 ### AI Services
 - **Google Gemini**: Primary LLM for question generation and analysis
-- **Anthropic Claude**: Secondary LLM for student response analysis
+- **OpenRouter**: Secondary LLM service for response analysis
 - **Configuration**: Environment-based API key management
 
 ### Database
@@ -87,7 +88,6 @@ The core of the application is a sophisticated multi-agent system that processes
 
 ### Third-Party Services
 - **Firebase**: Planned integration for authentication and real-time features
-- **Replit**: Development environment with hot reload capabilities
 
 ### UI Dependencies
 - **Radix UI**: Comprehensive set of accessible UI primitives
@@ -95,10 +95,10 @@ The core of the application is a sophisticated multi-agent system that processes
 - **Lucide React**: Icon library for consistent iconography
 - **React Hook Form**: Form validation and management
 
-## Deployment Strategy
+## Development
 
-### Development
-- **Local Development**: Vite dev server with hot module replacement
+### Local Development
+- **Frontend**: Vite dev server with hot module replacement
 - **Backend**: tsx for TypeScript execution with nodemon-like behavior
 - **Database**: Drizzle Kit for schema synchronization
 - **Environment**: .env file management for API keys and configuration
@@ -110,9 +110,36 @@ The core of the application is a sophisticated multi-agent system that processes
 - **Deployment**: Express server serving both API and static assets
 
 ### Environment Configuration
-- **API Keys**: Gemini and Anthropic API keys for AI services
+- **API Keys**: Gemini and OpenRouter API keys for AI services
 - **Database**: PostgreSQL connection string
 - **Firebase**: Service account credentials for authentication
 - **Runtime**: NODE_ENV for environment-specific behavior
 
-The application is designed to be deployed on platforms like Replit, with support for both development and production environments through environment variable configuration.
+## Getting Started
+
+1. Clone the repository
+2. Install dependencies: `npm install`
+3. Set up environment variables in `.env`
+4. Run database migrations: `npm run db:push`
+5. Start development server: `npm run dev`
+6. Access the application at `http://localhost:5000`
+
+## Environment Variables
+
+Create a `.env` file in the root directory with the following variables:
+
+```
+DATABASE_URL=your_postgresql_connection_string
+GEMINI_API_KEY=your_gemini_api_key
+OPENROUTER_API_KEY=your_openrouter_api_key
+NODE_ENV=development
+PORT=5000
+```
+
+## Scripts
+
+- `npm run dev` - Start development server
+- `npm run build` - Build for production
+- `npm run start` - Start production server
+- `npm run check` - Type check with TypeScript
+- `npm run db:push` - Push database schema changes
