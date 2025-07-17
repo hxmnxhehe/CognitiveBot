@@ -1,17 +1,17 @@
 import { GoogleGenAI } from '@google/genai';
-import Anthropic from '@anthropic-ai/sdk';
+import OpenRouter from 'openrouter-api';
 
 class LLMService {
   private gemini: GoogleGenAI;
-  private anthropic: Anthropic;
+  private openrouter: OpenRouter;
 
   constructor() {
     this.gemini = new GoogleGenAI({ 
       apiKey: process.env.GEMINI_API_KEY || '' 
     });
     
-    this.anthropic = new Anthropic({
-      apiKey: process.env.ANTHROPIC_API_KEY || '',
+    this.openrouter = new OpenRouter({
+      apiKey: process.env.OPENROUTER_API_KEY || '',
     });
   }
 
@@ -29,31 +29,31 @@ class LLMService {
     }
   }
 
-  async callClaude(prompt: string): Promise<string> {
+  async callOpenRouter(prompt: string): Promise<string> {
     try {
-      const response = await this.anthropic.messages.create({
-        model: "claude-sonnet-4-20250514",
+      const response = await this.openrouter.chat.completions.create({
+        model: "anthropic/claude-3-sonnet",
         max_tokens: 500,
         messages: [{ role: "user", content: prompt }],
       });
 
-      return response.content[0]?.text || "I'm having trouble connecting to Claude right now.";
+      return response.choices[0]?.message?.content || "I'm having trouble connecting to OpenRouter right now.";
     } catch (error) {
-      console.error('Error calling Claude:', error);
-      return "I'm having trouble connecting to Claude right now.";
+      console.error('Error calling OpenRouter:', error);
+      return "I'm having trouble connecting to OpenRouter right now.";
     }
   }
 
   async analyzeStudentResponse(prompt: string): Promise<any> {
     try {
-      // Try Anthropic first, fallback to Gemini if it fails
-      const response = await this.anthropic.messages.create({
-        model: "claude-sonnet-4-20250514",
+      // Try OpenRouter first, fallback to Gemini if it fails
+      const response = await this.openrouter.chat.completions.create({
+        model: "anthropic/claude-3-sonnet",
         max_tokens: 1000,
         messages: [{ role: "user", content: prompt }],
       });
 
-      const responseText = response.content[0]?.text || '{}';
+      const responseText = response.choices[0]?.message?.content || '{}';
       
       try {
         return JSON.parse(responseText);
@@ -66,7 +66,7 @@ class LLMService {
         };
       }
     } catch (error) {
-      console.error('Error with Anthropic, falling back to Gemini:', error);
+      console.error('Error with OpenRouter, falling back to Gemini:', error);
       
       // Fallback to Gemini for analysis
       try {
@@ -85,7 +85,7 @@ class LLMService {
           };
         }
       } catch (geminiError) {
-        console.error('Both Anthropic and Gemini failed:', geminiError);
+        console.error('Both OpenRouter and Gemini failed:', geminiError);
         return {
           knowledge_areas: {},
           misconceptions: {},
