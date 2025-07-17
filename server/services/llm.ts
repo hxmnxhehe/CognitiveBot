@@ -6,6 +6,14 @@ class LLMService {
   private openrouter: OpenAI;
 
   constructor() {
+    // Validate required API keys
+    if (!process.env.GEMINI_API_KEY) {
+      console.warn('GEMINI_API_KEY not found in environment variables');
+    }
+    if (!process.env.OPENROUTER_API_KEY) {
+      console.warn('OPENROUTER_API_KEY not found in environment variables');
+    }
+
     this.gemini = new GoogleGenAI({ 
       apiKey: process.env.GEMINI_API_KEY || '' 
     });
