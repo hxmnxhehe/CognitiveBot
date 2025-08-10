@@ -1,10 +1,13 @@
-import express, { type Request, Response, NextFunction } from "express";
+import express from "express";
 import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
+import { serveStatic } from "./vite";
+import serverless from "serverless-http";
 
 const app = express();
+registerRoutes(app);
+serveStatic(app);
 
-// Production optimizations
+export const handler = serverless(app);
 if (process.env.NODE_ENV === 'production') {
   app.set('trust proxy', 1);
   app.use(express.json({ limit: '10mb' }));
@@ -55,19 +58,12 @@ app.use((req, res, next) => {
     throw err;
   });
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
   if (app.get("env") === "development") {
     await setupVite(app, server);
   } else {
     serveStatic(app);
   }
 
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || '5000', 10);
   const serverInstance = server.listen({
     port,
@@ -77,7 +73,6 @@ app.use((req, res, next) => {
     log(`serving on port ${port}`);
   });
 
-  // Graceful shutdown handling
   process.on('SIGTERM', () => {
     log('SIGTERM received, shutting down gracefully');
     serverInstance.close(() => {
@@ -94,7 +89,6 @@ app.use((req, res, next) => {
     });
   });
 
-  // Handle uncaught exceptions
   process.on('uncaughtException', (err) => {
     log('Uncaught Exception:', err);
     process.exit(1);
