@@ -10,16 +10,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Initialize Firebase
   await firebaseService.initialize();
 
-  // Health check endpoint
-  app.get("/api/health", async (req, res) => {
-    res.json({ 
-      status: "ok", 
+  // Health check endpoint for deployment monitoring
+  app.get('/health', (_req, res) => {
+    res.status(200).json({
+      status: 'healthy',
       timestamp: new Date().toISOString(),
-      services: {
-        firebase: "available",
-        gemini: process.env.GEMINI_API_KEY ? "configured" : "missing_key",
-        anthropic: process.env.ANTHROPIC_API_KEY ? "configured" : "missing_key"
-      }
+      environment: process.env.NODE_ENV
     });
   });
 
@@ -28,7 +24,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.headers['x-user-id'] as string || `user_${Date.now()}`;
       const session = await storage.createSession(userId);
-      
+
       res.json({
         session_id: session.id,
         user_id: session.user_id,
@@ -113,7 +109,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(response);
     } catch (error) {
       console.error('Error processing message:', error);
-      
+
       if (error instanceof z.ZodError) {
         res.status(400).json({ error: "Invalid request format", details: error.errors });
       } else {
@@ -127,7 +123,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { sessionId } = req.params;
       const session = await storage.getSession(sessionId);
-      
+
       if (!session) {
         res.status(404).json({ error: "Session not found" });
         return;

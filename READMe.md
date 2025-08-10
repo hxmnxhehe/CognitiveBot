@@ -117,12 +117,34 @@ The core of the application is a sophisticated multi-agent system that processes
 
 ## Getting Started
 
+### Local Development
 1. Clone the repository
 2. Install dependencies: `npm install`
-3. Set up environment variables in `.env`
-4. Run database migrations: `npm run db:push`
-5. Start development server: `npm run dev`
-6. Access the application at `http://localhost:5000`
+3. Copy environment template: `cp .env.example .env`
+4. Set up environment variables in `.env`
+5. Run database migrations: `npm run db:push`
+6. Start development server: `npm run dev`
+7. Access the application at `http://localhost:5000`
+
+### Production Deployment on Replit
+
+1. **Environment Setup**: Configure your environment variables in Replit Secrets:
+   - `DATABASE_URL`: Your PostgreSQL connection string
+   - `GEMINI_API_KEY`: Google Gemini API key
+   - `OPENROUTER_API_KEY`: OpenRouter API key
+   - `NODE_ENV`: Set to `production`
+
+2. **Database Setup**: Run migrations after environment setup:
+   ```bash
+   npm run db:push
+   ```
+
+3. **Deploy**: Use Replit's Deployment feature:
+   - Build command: `npm run build`
+   - Run command: `npm run start`
+   - The app will be available on your deployment URL
+
+4. **Health Monitoring**: Access `/health` endpoint to verify deployment status
 
 ## Environment Variables
 
