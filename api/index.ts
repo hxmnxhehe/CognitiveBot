@@ -5,7 +5,6 @@ import serverless from "serverless-http";
 
 const app = express();
 
-// Production optimizations
 if (process.env.NODE_ENV === 'production') {
   app.set('trust proxy', 1);
   app.use(express.json({ limit: '10mb' }));
@@ -15,11 +14,10 @@ if (process.env.NODE_ENV === 'production') {
   app.use(express.urlencoded({ extended: false }));
 }
 
-// Request logging
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined;
+  let capturedJsonResponse: Record<string, any> | undefined = undefined;
 
   const originalResJson = res.json;
   res.json = function (bodyJson, ...args) {
@@ -34,9 +32,11 @@ app.use((req, res, next) => {
       if (capturedJsonResponse) {
         logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
       }
+
       if (logLine.length > 80) {
         logLine = logLine.slice(0, 79) + "…";
       }
+
       log(logLine);
     }
   });
@@ -44,22 +44,20 @@ app.use((req, res, next) => {
   next();
 });
 
-// Register API routes
 registerRoutes(app);
 
-// Serve static client in production
+// Serve static built client in production
 if (process.env.NODE_ENV === "production") {
   serveStatic(app);
 }
 
-// Error handling
+// Error handler
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   const status = err.status || err.statusCode || 500;
   const message = err.message || "Internal Server Error";
   res.status(status).json({ message });
 });
 
-// Vercel serverless export
 export const config = {
   api: {
     bodyParser: false
