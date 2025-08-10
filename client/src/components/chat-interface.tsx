@@ -1,198 +1,216 @@
-import { useState, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Card } from '@/components/ui/card';
-import { Message } from './message';
-import { ThinkingIndicator } from './thinking-indicator';
-import { useChat } from '@/hooks/use-chat';
+import { Message } from '@/components/message';
+import { ChatMessage } from '@shared/schema';
 
 interface ChatInterfaceProps {
-  userId?: string;
+  userId: string;
 }
 
+// Fun suggestion prompts with emojis
+const suggestionPrompts = [
+  { text: "I'm struggling with this problem - can you help me think through it? 🤔", emoji: "💭" },
+  { text: "What questions should I ask myself about this topic? 🔍", emoji: "❓" },
+  { text: "How can I break down this complex idea into smaller parts? 🧩", emoji: "🔬" },
+  { text: "What assumptions am I making that I should examine? 🎯", emoji: "🤨" },
+  { text: "Can you guide me to discover the answer myself? 🗺️", emoji: "🧭" },
+  { text: "What's the deeper meaning behind what I'm learning? 💡", emoji: "🎭" }
+];
+
 export function ChatInterface({ userId }: ChatInterfaceProps) {
-  const [inputMessage, setInputMessage] = useState('');
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [inputValue, setInputValue] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(true);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  
-  const { 
-    messages, 
-    isThinking, 
-    sessionId, 
-    sendMessage, 
-    clearChat, 
-    messagesEndRef,
-    isLoading 
-  } = useChat({ userId });
 
-  const handleSendMessage = async () => {
-    if (!inputMessage.trim() || isLoading) return;
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
-    const message = inputMessage.trim();
-    setInputMessage('');
-    
-    // Auto-resize textarea
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-    }
+  // Focus on textarea when component mounts
+  useEffect(() => {
+    textareaRef.current?.focus();
+  }, []);
 
-    await sendMessage(message);
+  const handleSuggestionClick = (suggestion: string) => {
+    setInputValue(suggestion);
+    setShowSuggestions(false);
+    textareaRef.current?.focus();
+  };
+
+  const handleSubmit = async () => {
+    if (!inputValue.trim() || isLoading) return;
+
+    const userMessage: ChatMessage = {
+      id: `msg_${Date.now()}`,
+      role: 'user',
+      content: inputValue.trim(),
+      timestamp: new Date(),
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    setInputValue('');
+    setIsLoading(true);
+    setShowSuggestions(false); // Hide suggestions once chat starts
+
+    // Simulate AI response (replace with actual API call)
+    setTimeout(() => {
+      const aiMessage: ChatMessage = {
+        id: `msg_${Date.now() + 1}`,
+        role: 'assistant',
+        content: `I'd be happy to help you with that! Let me think about "${userMessage.content}" and provide you with a detailed response...`,
+        timestamp: new Date(),
+        agent_type: 'questioning',
+      };
+      setMessages(prev => [...prev, aiMessage]);
+      setIsLoading(false);
+    }, 1500);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSendMessage();
+      handleSubmit();
     }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setInputMessage(e.target.value);
-    
-    // Auto-resize textarea
-    e.target.style.height = 'auto';
-    e.target.style.height = `${e.target.scrollHeight}px`;
-  };
-
-  const quickActions = [
-    "I need help with...",
-    "Can you explain...",
-    "I'm confused about...",
-  ];
+  const isEmpty = messages.length === 0;
 
   return (
-    <main className="flex-1 flex flex-col overflow-hidden">
-      {/* Chat Messages Area */}
-      <div className="flex-1 p-6 overflow-y-auto cyber-scrollbar">
-        <div className="max-w-4xl mx-auto">
-          {/* Welcome Message */}
-          {messages.length === 0 && !isThinking && (
-            <div className="text-center mb-8">
-              <div className="inline-block p-6 rounded-2xl glass-effect neon-border animate-float">
-                <i className="fas fa-graduation-cap text-4xl text-cyan-400 mb-4"></i>
-                <h2 className="text-2xl font-bold gradient-text mb-2">Welcome to CognitiveGPT</h2>
-                <p className="text-slate-400">Your Socratic AI tutor is ready to guide your learning journey</p>
+    <div className="flex-1 flex flex-col relative">
+      {/* Main Chat Area */}
+      <div className="flex-1 overflow-y-auto">
+        {isEmpty ? (
+          /* Welcome Screen with Centered Input */
+          <div className="h-full flex flex-col items-center justify-center p-8">
+            {/* Welcome Message */}
+            <div className="text-center mb-12 max-w-2xl">
+              <div className="text-8xl mb-6 animate-bounce">🤖</div>
+              <h1 className="text-4xl md:text-5xl font-extrabold mb-4 bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+                Hey there, learner! 👋
+              </h1>
+              <p className="text-xl text-slate-300 mb-2">
+                Ready to explore, discover, and learn together?
+              </p>
+              <p className="text-lg text-slate-400">
+                Ask me anything - I'm here to help! ✨
+              </p>
+            </div>
+
+            {/* Centered Input Box */}
+            <div className="w-full max-w-3xl mb-8">
+              <div className="relative">
+                <Textarea
+                  ref={textareaRef}
+                  placeholder="What would you like to learn today? Type your question here! 🤔"
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  className="min-h-[60px] max-h-[200px] text-lg p-6 rounded-3xl bg-gradient-to-r from-slate-800/80 to-slate-700/80 backdrop-blur-lg border-3 border-dashed border-cyan-400/40 text-white placeholder:text-slate-400 resize-none shadow-2xl focus:border-purple-400/60 focus:shadow-purple-400/20 transition-all duration-300"
+                />
+                <Button
+                  onClick={handleSubmit}
+                  disabled={!inputValue.trim() || isLoading}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 h-12 w-12 rounded-2xl bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-400 hover:to-emerald-400 disabled:from-gray-600 disabled:to-gray-500 border-2 border-dashed border-white/30 shadow-lg transform hover:scale-110 transition-all duration-300"
+                >
+                  {isLoading ? (
+                    <i className="fas fa-spinner animate-spin text-white"></i>
+                  ) : (
+                    <i className="fas fa-paper-plane text-white"></i>
+                  )}
+                </Button>
               </div>
             </div>
-          )}
 
-          {/* Chat Messages */}
-          <div className="space-y-6">
+            {/* Suggestion Cards */}
+            {showSuggestions && (
+              <div className="w-full max-w-4xl">
+                <h3 className="text-center text-xl font-bold text-slate-300 mb-6 flex items-center justify-center space-x-2">
+                  <span className="text-2xl">💡</span>
+                  <span>Try asking about...</span>
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {suggestionPrompts.map((prompt, index) => (
+                    <div
+                      key={index}
+                      onClick={() => handleSuggestionClick(prompt.text)}
+                      className="group cursor-pointer p-4 bg-gradient-to-br from-slate-800/60 to-slate-700/60 hover:from-slate-700/80 hover:to-slate-600/80 rounded-2xl border-2 border-dashed border-slate-600/50 hover:border-cyan-400/50 transition-all duration-300 transform hover:scale-105 hover:-rotate-1 shadow-lg hover:shadow-cyan-400/20"
+                    >
+                      <div className="flex items-center space-x-3">
+                        <div className="text-3xl group-hover:animate-bounce">{prompt.emoji}</div>
+                        <p className="text-slate-200 group-hover:text-cyan-300 transition-colors font-medium">
+                          {prompt.text}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          /* Chat Messages View */
+          <div className="p-6 space-y-6">
             {messages.map((message) => (
               <Message key={message.id} message={message} />
             ))}
-            
-            {/* Thinking State */}
-            {isThinking && <ThinkingIndicator />}
-            
-            {/* Scroll anchor */}
+            {isLoading && (
+              <div className="flex items-center space-x-4 animate-pulse">
+                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center">
+                  <i className="fas fa-robot text-white animate-bounce"></i>
+                </div>
+                <div className="flex-1">
+                  <div className="bg-slate-800/80 p-4 rounded-2xl border-2 border-dashed border-cyan-400/30 max-w-md">
+                    <div className="flex items-center space-x-2">
+                      <div className="flex space-x-1">
+                        <div className="w-2 h-2 bg-cyan-400 rounded-full animate-bounce"></div>
+                        <div className="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                        <div className="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                      </div>
+                      <span className="text-slate-400 text-sm">Thinking...</span>
+                      <span className="text-lg animate-spin">🧠</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
             <div ref={messagesEndRef} />
           </div>
-        </div>
+        )}
       </div>
 
-      {/* Message Input Area */}
-      <div className="border-t border-slate-700 glass-effect p-6">
-        <div className="max-w-4xl mx-auto">
-          <div className="flex items-end space-x-4">
-            {/* Input Field */}
-            <div className="flex-1 relative">
-              <Textarea 
+      {/* Bottom Input (shown when chat has started) */}
+      {!isEmpty && (
+        <div className="border-t-3 border-dashed border-cyan-400/30 bg-gradient-to-r from-slate-900/90 to-slate-800/90 backdrop-blur-lg p-6">
+          <div className="max-w-4xl mx-auto">
+            <div className="relative">
+              <Textarea
                 ref={textareaRef}
-                value={inputMessage}
-                onChange={handleInputChange}
+                placeholder="Continue the conversation... 💬"
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
                 onKeyPress={handleKeyPress}
-                className="w-full p-4 pr-12 rounded-2xl bg-slate-800/80 border border-slate-600 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20 focus:outline-none text-slate-200 placeholder-slate-500 resize-none cyber-scrollbar min-h-[48px] max-h-32"
-                placeholder="Share your thoughts and questions..."
-                disabled={isLoading}
+                className="min-h-[60px] max-h-[200px] text-lg p-4 pr-16 rounded-2xl bg-slate-800/80 border-2 border-dashed border-slate-600/50 focus:border-cyan-400/60 text-white placeholder:text-slate-400 resize-none shadow-xl transition-all duration-300"
               />
-              
-              {/* Character Counter */}
-              <div className="absolute bottom-2 right-2 text-xs text-slate-500">
-                {inputMessage.length}/500
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex flex-col space-y-2">
-              {/* Send Button */}
-              <Button 
-                onClick={handleSendMessage}
-                disabled={!inputMessage.trim() || isLoading}
-                className="px-6 py-3 rounded-xl bg-gradient-to-r from-cyan-400 to-blue-500 text-slate-900 font-semibold shadow-lg hover:shadow-cyan-400/30 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed neon-border border-cyan-400"
-              >
-                <i className="fas fa-paper-plane mr-2"></i>
-                Send
-              </Button>
-
-              {/* Additional Actions */}
-              <div className="flex space-x-2">
-                {/* Voice Input */}
-                <Button 
-                  variant="outline"
-                  size="sm"
-                  className="p-2 rounded-lg bg-slate-800 border border-slate-600 hover:border-cyan-400 hover:bg-slate-700 transition-colors"
-                  disabled
-                  title="Voice input (coming soon)"
-                >
-                  <i className="fas fa-microphone text-slate-400"></i>
-                </Button>
-                
-                {/* Attachment */}
-                <Button 
-                  variant="outline"
-                  size="sm"
-                  className="p-2 rounded-lg bg-slate-800 border border-slate-600 hover:border-cyan-400 hover:bg-slate-700 transition-colors"
-                  disabled
-                  title="File attachment (coming soon)"
-                >
-                  <i className="fas fa-paperclip text-slate-400"></i>
-                </Button>
-              </div>
-            </div>
-          </div>
-
-          {/* Quick Actions */}
-          <div className="flex items-center justify-between mt-4">
-            <div className="flex space-x-2">
-              {quickActions.map((action, index) => (
-                <Button
-                  key={index}
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setInputMessage(action)}
-                  className="px-3 py-1 text-xs rounded-full bg-slate-800 border border-slate-600 hover:border-cyan-400 text-slate-400 hover:text-cyan-400 transition-colors"
-                >
-                  {action}
-                </Button>
-              ))}
-            </div>
-
-            {/* Session Controls */}
-            <div className="flex items-center space-x-2">
               <Button
-                variant="ghost"
-                size="sm"
-                onClick={clearChat}
-                className="text-xs text-slate-500 hover:text-slate-400 transition-colors"
-                disabled={messages.length === 0}
+                onClick={handleSubmit}
+                disabled={!inputValue.trim() || isLoading}
+                className="absolute right-3 top-1/2 -translate-y-1/2 h-10 w-10 rounded-xl bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-400 hover:to-pink-400 disabled:from-gray-600 disabled:to-gray-500 border-2 border-dashed border-white/20 shadow-md transform hover:scale-110 transition-all duration-300"
               >
-                <i className="fas fa-trash-alt mr-1"></i>
-                Clear Chat
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-xs text-slate-500 hover:text-slate-400 transition-colors"
-                disabled
-                title="Export (coming soon)"
-              >
-                <i className="fas fa-download mr-1"></i>
-                Export
+                {isLoading ? (
+                  <i className="fas fa-spinner animate-spin text-white text-sm"></i>
+                ) : (
+                  <i className="fas fa-paper-plane text-white text-sm"></i>
+                )}
               </Button>
             </div>
           </div>
         </div>
-      </div>
-    </main>
+      )}
+    </div>
   );
 }
