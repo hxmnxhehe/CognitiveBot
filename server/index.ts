@@ -1,9 +1,10 @@
+
 import express, { type Request, Response, NextFunction } from "express";
-import { registerRoutes } from "../server/routes";
-import { serveStatic, log } from "../server/vite";
-import serverless from "serverless-http";
+import { registerRoutes } from "./routes";
+import { serveStatic, log } from "./vite";
 
 const app = express();
+const PORT = process.env.PORT || 5000;
 
 // Production optimizations
 if (process.env.NODE_ENV === 'production') {
@@ -59,11 +60,11 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   res.status(status).json({ message });
 });
 
-// Vercel serverless export
-export const config = {
-  api: {
-    bodyParser: false
-  }
-};
+// Start server for Replit
+if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+  app.listen(PORT, '0.0.0.0', () => {
+    log(`Server running on http://0.0.0.0:${PORT}`);
+  });
+}
 
-export default serverless(app);
+export default app;
