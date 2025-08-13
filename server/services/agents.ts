@@ -1,11 +1,11 @@
-import { AgentState, StudentProfile } from '@shared/schema';
-import { llmService } from './llm';
-import { storage } from '../storage';
+import { AgentState, StudentProfile } from '../../shared/schema.js';
+import { llmService } from './llm.js';
+import { storage } from '../storage.js';
 
 export class QuestioningAgent {
   async process(state: AgentState): Promise<Partial<AgentState>> {
     console.log("--- QuestioningAgent: Crafting Socratic prompt ---");
-    
+
     const studentProfile = state.student_profile;
     const lastMessage = state.current_message;
 
@@ -20,20 +20,37 @@ Avoid direct answers. Focus on principles, implications, or alternative perspect
 Keep your response under 200 words and make it engaging.
 `;
 
-    const socraticQuestion = await llmService.callGemini(llmPrompt);
-    console.log(`Generated Question: ${socraticQuestion}`);
+    try {
+      const socraticQuestion = await llmService.callGemini(llmPrompt);
+      console.log(`Generated Question: ${socraticQuestion}`);
 
-    return {
-      current_question: socraticQuestion,
-      next_action: "await_student_response"
-    };
+      return {
+        current_question: socraticQuestion,
+        next_action: "await_student_response"
+      };
+    } catch (error) {
+      console.error('Error in QuestioningAgent:', error);
+
+      // Fallback response
+      const fallbackQuestions = [
+        "That's interesting! Can you tell me more about what you're thinking?",
+        "What makes you feel that way about this topic?",
+        "How did you come to that conclusion?",
+        "What do you think might happen if we approached this differently?",
+      ];
+
+      return {
+        current_question: fallbackQuestions[Math.floor(Math.random() * fallbackQuestions.length)],
+        next_action: "await_student_response"
+      };
+    }
   }
 }
 
 export class StudentModelAgent {
   async process(state: AgentState): Promise<Partial<AgentState>> {
     console.log("--- StudentModelAgent: Updating student profile ---");
-    
+
     const userId = state.user_id;
     const studentResponse = state.current_message;
     const currentQuestion = state.current_question;
@@ -61,28 +78,57 @@ Example JSON format:
 Provide only the JSON object.
 `;
 
-    const profileUpdates = await llmService.analyzeStudentResponse(llmAnalysisPrompt);
-    
     try {
+      const profileUpdates = await llmService.analyzeStudentResponse(llmAnalysisPrompt);
+
       await storage.updateStudentProfile(userId, profileUpdates);
       console.log(`Student profile updated for ${userId}`);
+
+      const updatedProfile = await storage.getStudentProfile(userId);
+
+      return {
+        student_profile: updatedProfile,
+        next_action: "evaluate_feedback"
+      };
     } catch (error) {
       console.error('Failed to update student profile:', error);
-    }
 
-    const updatedProfile = await storage.getStudentProfile(userId);
-    
-    return {
-      student_profile: updatedProfile,
-      next_action: "evaluate_feedback"
-    };
+      // Fallback profile update
+      const fallbackUpdate = {
+        last_interaction_summary: `Student said: "${studentResponse}"`,
+        progress_log: [
+          ...state.student_profile.progress_log,
+          `${new Date().toISOString()}: ${studentResponse}`
+        ].slice(-50)
+      };
+
+      try {
+        await storage.updateStudentProfile(userId, fallbackUpdate);
+        const updatedProfile = await storage.getStudentProfile(userId);
+
+        return {
+          student_profile: updatedProfile,
+          next_action: "evaluate_feedback"
+        };
+      } catch (storageError) {
+        console.error('Fallback profile update also failed:', storageError);
+
+        return {
+          student_profile: {
+            ...state.student_profile,
+            ...fallbackUpdate
+          },
+          next_action: "evaluate_feedback"
+        };
+      }
+    }
   }
 }
 
 export class FeedbackAgent {
   async process(state: AgentState): Promise<Partial<AgentState>> {
     console.log("--- FeedbackAgent: Evaluating student response ---");
-    
+
     const studentResponse = state.current_message;
     const currentQuestion = state.current_question;
     const studentProfile = state.student_profile;
@@ -102,30 +148,42 @@ Provide a concise internal feedback string (e.g., "Good progress", "Needs more p
 This feedback will inform the next Socratic question.
 `;
 
-    const feedbackResult = await llmService.callGemini(llmFeedbackPrompt);
-    console.log(`Feedback: ${feedbackResult}`);
+    try {
+      const feedbackResult = await llmService.callGemini(llmFeedbackPrompt);
+      console.log(`Feedback: ${feedbackResult}`);
 
-    return {
-      feedback: feedbackResult,
-      next_action: "check_safety"
-    };
+      return {
+        feedback: feedbackResult,
+        next_action: "check_safety"
+      };
+    } catch (error) {
+      console.error('Error in FeedbackAgent:', error);
+
+      // Fallback feedback
+      const fallbackFeedback = "Student is engaging with the material. Continue probing for deeper understanding.";
+
+      return {
+        feedback: fallbackFeedback,
+        next_action: "check_safety"
+      };
+    }
   }
 }
 
 export class SafetyAgent {
   async process(state: AgentState): Promise<Partial<AgentState>> {
     console.log("--- SafetyAgent: Performing safety check ---");
-    
+
     const responseToCheck = state.current_question;
     const studentResponse = state.current_message;
 
     // Simple safety checks - in production, use more sophisticated moderation
     const flaggedTerms = ['hate', 'harmful', 'inappropriate', 'violence', 'explicit'];
-    
+
     const questionHasIssues = flaggedTerms.some(term => 
       responseToCheck.toLowerCase().includes(term)
     );
-    
+
     const studentResponseHasIssues = flaggedTerms.some(term => 
       studentResponse.toLowerCase().includes(term)
     );

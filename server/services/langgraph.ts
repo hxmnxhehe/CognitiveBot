@@ -1,5 +1,5 @@
-import { AgentState } from '@shared/schema';
-import { QuestioningAgent, StudentModelAgent, FeedbackAgent, SafetyAgent } from './agents';
+import { AgentState } from '../../shared/schema.js';
+import { QuestioningAgent, StudentModelAgent, FeedbackAgent, SafetyAgent } from './agents.js';
 
 export class LangGraphWorkflow {
   private questioningAgent = new QuestioningAgent();
@@ -36,7 +36,7 @@ export class LangGraphWorkflow {
       return currentState;
     } catch (error) {
       console.error('Error in LangGraph workflow:', error);
-      
+
       // Fallback response
       return {
         ...currentState,
@@ -50,8 +50,8 @@ export class LangGraphWorkflow {
   getAgentStatus(state: AgentState) {
     return {
       questioning_agent: state.next_action === 're_question' ? 'processing' : 'active',
-      student_model_agent: 'idle',
-      feedback_agent: 'idle',
+      student_model_agent: 'idle' as const,
+      feedback_agent: 'idle' as const,
       safety_agent: state.safety_check_result === 'FLAGGED' ? 'active' : 'idle',
     };
   }

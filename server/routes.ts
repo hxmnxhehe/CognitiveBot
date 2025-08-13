@@ -1,21 +1,42 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { storage } from "./storage";
-import { firebaseService } from "./services/firebase";
-import { langGraphWorkflow } from "./services/langgraph";
-import { sendMessageSchema, chatResponseSchema, AgentState } from "@shared/schema";
+import { storage } from "./storage.js";
+import { firebaseService } from "./services/firebase.js";
+import { langGraphWorkflow } from "./services/langgraph.js";
+import { llmService } from "./services/llm.js";
+import { sendMessageSchema, chatResponseSchema, type AgentState, type ChatMessage } from "../shared/schema.js";
 import { z } from "zod";
 
-export async function registerRoutes(app: Express): Promise<Server> {
+export async function registerRoutes(app: Express): Promise<void> {
   // Initialize Firebase
-  await firebaseService.initialize();
+  try {
+    await firebaseService.initialize();
+  } catch (error) {
+    console.error('Firebase initialization failed:', error);
+  }
 
   // Health check endpoint for deployment monitoring
   app.get('/health', (_req, res) => {
     res.status(200).json({
       status: 'healthy',
       timestamp: new Date().toISOString(),
-      environment: process.env.NODE_ENV
+      environment: process.env.NODE_ENV || 'development'
+    });
+  });
+
+  // API info endpoint
+  app.get('/api', (_req, res) => {
+    res.json({
+      name: 'Learning Assistant API',
+      version: '1.0.0',
+      endpoints: [
+        'GET /health',
+        'POST /api/chat/session',
+        'POST /api/chat/message',
+        'GET /api/chat/session/:sessionId',
+        'GET /api/chat/sessions',
+        'GET /api/student-profile'
+      ]
     });
   });
 
@@ -50,6 +71,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Add user message to session
       const userMessage = await storage.addMessage(session.id, {
+        id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         content: message,
         role: 'user',
         timestamp: new Date(),
@@ -79,6 +101,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Add bot response to session
       const botMessage = await storage.addMessage(session.id, {
+        id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         content: finalState.current_question,
         role: 'assistant',
         timestamp: new Date(),
@@ -91,13 +114,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         student_profile: finalState.student_profile
       });
 
-      // Save to Firebase
-      await firebaseService.saveStudentProfile(userId, finalState.student_profile);
-      await firebaseService.saveSession(session.id, {
-        ...session,
-        student_profile: finalState.student_profile,
-        updated_at: new Date()
-      });
+      // Save to Firebase (if available)
+      try {
+        await firebaseService.saveStudentProfile(userId, finalState.student_profile);
+        await firebaseService.saveSession(session.id, {
+          ...session,
+          student_profile: finalState.student_profile,
+          updated_at: new Date()
+        });
+      } catch (firebaseError) {
+        console.warn('Firebase save failed:', firebaseError);
+      }
 
       const response = chatResponseSchema.parse({
         session_id: session.id,
@@ -170,6 +197,5 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  const httpServer = createServer(app);
-  return httpServer;
+  // Routes registered successfully
 }

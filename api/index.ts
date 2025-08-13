@@ -4,8 +4,14 @@ import app from "../server/index";
 // Vercel serverless export
 export const config = {
   api: {
-    bodyParser: false
+    bodyParser: false,
+    externalResolver: true
   }
 };
 
-export default serverless(app);
+// Wrap the Express app for serverless
+const handler = serverless(app, {
+  binary: ['image/*', 'font/*', 'audio/*', 'video/*']
+});
+
+export default handler;
